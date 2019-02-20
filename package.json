@@ -9,10 +9,6 @@
       "ios"
     ]
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/javames/agoraaudio.git"
-  },
   "keywords": [
     "ecosystem:cordova",
     "cordova-android",

@@ -4,7 +4,8 @@ exports.voiceChat = function (arg0, success, error) {
 	var token=arg0.token
 	var channel=arg0.channel
 	var extraString=arg0.extraString
-	var args = [token,channel,extraString];
+	var uid=arg0.uid
+	var args = [token,channel,extraString,uid];
     exec(success, error, 'VoicePlugin', 'voiceChat', args);
 }
 
@@ -18,5 +19,12 @@ exports.leaveChannel = function (arg0, success, error) {
 
 exports.destroy = function (arg0, success, error) {
     exec(success, error, 'VoicePlugin', 'destroy', [arg0]);
+}
+
+exports.muteRemoteAudioStream = function (arg0, success, error) {
+	var state=arg0.state
+	var uid=arg0.uid
+	var args = [state,uid];
+    exec(success, error, 'VoicePlugin', 'muteRemoteAudioStream', args);
 }
 

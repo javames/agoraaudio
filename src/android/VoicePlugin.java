@@ -19,6 +19,7 @@ public class VoicePlugin extends CordovaPlugin {
 
     private static final String JOINCHANNEL="voiceChat";
     private static final String MUTELOCALAUDIOSTREAM="muteLocalAudioStream";
+	private static final String MUTEREMOTEAUDIOSTREAM="muteRemoteAudioStream";
     private static final String LEAVECHANNEL="leaveChannel";
     private static final String DESTROY="destroy";
     private static final int PERMISSION_REQ_ID_RECORD_AUDIO = 22;
@@ -46,6 +47,9 @@ public class VoicePlugin extends CordovaPlugin {
         }else if(DESTROY.equals(action)){
             this.destroy();
             return true;
+        }else if(MUTEREMOTEAUDIOSTREAM.equals(action)){
+            this.muteRemoteAudioStream(args,callbackContext);
+            return true;
         }
         return false;
     }
@@ -65,20 +69,42 @@ public class VoicePlugin extends CordovaPlugin {
     private void muteLocalAudioStream(JSONArray args, CallbackContext callbackContext){
         try {
             Boolean select=args.getBoolean(0);
-            mRtcEngine.muteLocalAudioStream(select);
-            callbackContext.success();
+            int id =mRtcEngine.muteLocalAudioStream(select);
+            if(id==0){
+                callbackContext.success();
+            }else{
+                callbackContext.error(id);
+            }
         } catch (JSONException e) {
             callbackContext.error(e.getMessage());
             e.printStackTrace();
         }
     }
 
+	    //禁止接收对方发送来的信息
+    private void muteRemoteAudioStream(JSONArray args, CallbackContext callbackContext){
+        try {
+            Boolean select=args.getBoolean(0);
+            int uid=args.getInt(1);
+            int id = mRtcEngine.muteRemoteAudioStream(uid, select);
+			Log.i("test","muteRemoteAudioStream  uid: "+uid+" select: "+select);
+            if(id==0){
+                callbackContext.success();
+            }else{
+                callbackContext.error(id);
+            }
+        } catch (JSONException e) {
+            callbackContext.error(e.getMessage());
+            e.printStackTrace();
+        }
+    }
+	
     public void voiceChat(JSONArray args, CallbackContext callbackContext) {
         initAgoraEngineAndJoinChannel(args, callbackContext);
     }
 
     private void initAgoraEngineAndJoinChannel(JSONArray args,CallbackContext callbackContext) {
-        Log.i("test","initAgoraEngineAndJoinChannel ");
+        Log.i(LOG_TAG,"initAgoraEngineAndJoinChannel ");
         // Tutorial Step 1
         initializeAgoraEngine(callbackContext);
         // Tutorial Step 2
@@ -87,15 +113,15 @@ public class VoicePlugin extends CordovaPlugin {
 
     // Tutorial Step 2
     private void joinChannel(JSONArray args) {
-            Log.i("test","args: "+args);
+            Log.i(LOG_TAG,"args: "+args);
         try {
             String token=args.getString(0);
             String channel=args.getString(1);
             String extraString=args.getString(2);
-            Log.i("test","token: "+token+" channel: "+channel+" extraString: "+extraString);
+			int uid=args.getInt(3);
+            Log.i(LOG_TAG,"token: "+token+" channel: "+channel+" extraString: "+extraString);
             // if you do not specify the uid, we will generate the uid for you
-            mRtcEngine.joinChannel(token, channel, extraString, 0);
-            Log.i("test","joinChannel===============================");
+            mRtcEngine.joinChannel(token, channel, extraString, uid);
         } catch (JSONException e) {
             Log.e(LOG_TAG, "joinChannel failure!");
             e.printStackTrace();
@@ -105,10 +131,10 @@ public class VoicePlugin extends CordovaPlugin {
 
     private final IRtcEngineEventHandler mRtcEventHandler = new IRtcEngineEventHandler() {
 
-        //status  0为离线;1为关闭麦克风
+        //status  0为离线;1为关闭麦克风;2为加入频道成功
         @Override
         public void onUserOffline(final int uid, final int reason) { // Tutorial Step 4
-            Log.i("test","onUserOffline  uid: "+uid+"reason: "+reason);
+            Log.i(LOG_TAG,"onUserOffline  uid: "+uid+"reason: "+reason);
             if(null!=RtcEngineCallback){
                 JSONObject obj = new JSONObject();
                 try {
@@ -120,18 +146,12 @@ public class VoicePlugin extends CordovaPlugin {
                     e.printStackTrace();
                 }
             }
-              //对方退出或者掉线
-//            runOnUiThread(new Runnable() {
-//                @Override
-//                public void run() {
-//                    onRemoteUserLeft(uid, reason);
-//                }
-//            });
+
         }
 
         @Override
         public void onUserMuteAudio(final int uid, final boolean muted) { // Tutorial Step 6
-            Log.i("test","onUserMuteAudio  uid: "+uid+"muted: "+muted);
+            Log.i(LOG_TAG,"onUserMuteAudio  uid: "+uid+"muted: "+muted);
             if(null!=RtcEngineCallback){
                 JSONObject obj = new JSONObject();
                 try {
@@ -143,36 +163,49 @@ public class VoicePlugin extends CordovaPlugin {
                     e.printStackTrace();
                 }
             }
-            //静音
-//            runOnUiThread(new Runnable() {
-//                @Override
-//                public void run() {
-//                    onRemoteUserVoiceMuted(uid, muted);
-//                }
-//            });
         }
 
         @Override
         public void onError(int err) {
             super.onError(err);
-            Log.i("test","onError: "+err);
+            Log.i(LOG_TAG,"onError: "+err);
+			if(null!=RtcEngineCallback){
+                JSONObject obj = new JSONObject();
+                try {
+                    obj.put("status",3);
+                    obj.put("err",err);
+                    RtcEngineCallback.success(obj);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
         @Override
         public void onJoinChannelSuccess(String channel,int uid,int elapsed ){
-            Log.i("test","onJoinChannelSuccess: "+channel);
+            Log.i(LOG_TAG,"onJoinChannelSuccess: "+channel);
+			if(null!=RtcEngineCallback){
+                JSONObject obj = new JSONObject();
+                try {
+                    obj.put("status",2);
+                    obj.put("uid",uid);
+                    obj.put("channel",channel);
+                    RtcEngineCallback.success(obj);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     };
 
     private void initializeAgoraEngine(CallbackContext callbackContext) {
         try {
-            Log.i("test","initializeAgoraEngine ");
+            Log.i(LOG_TAG,"initializeAgoraEngine ");
             RtcEngineCallback=callbackContext;
             Activity activity = cordova.getActivity();
             String appId=activity.getString(getStringId(activity.getApplication(),"agora_app_id"));
-            Log.i("test","initializeAgoraEngine  appId: "+appId);
+            Log.i(LOG_TAG,"initializeAgoraEngine  appId: "+appId);
             mRtcEngine = RtcEngine.create(activity.getApplication().getBaseContext(), appId, mRtcEventHandler);
-            Log.i("test","initializeAgoraEngine ========================== ");
         } catch (Exception e) {
             if(null!=RtcEngineCallback){
                 RtcEngineCallback.error(e.getMessage());
